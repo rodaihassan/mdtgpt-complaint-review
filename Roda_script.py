@@ -11,8 +11,227 @@ import pandas as pd
 import requests
 import streamlit as st
 
-st.set_page_config(page_title="Raw Complaint Workbook to MDTGPT Model", layout="wide")
-st.title("Upload Raw Complaint Workbook and Send Product Event Records to MDTGPT Model")
+st.set_page_config(
+    page_title="QA Monitoring Tool",
+    layout="wide",
+    initial_sidebar_state="expanded",
+)
+
+st.title("QA Monitoring Tool")
+st.caption("Raw complaint review prioritization for QA monitoring")
+
+st.markdown("""
+<style>
+:root {
+    --mdt-navy: #123b5d;
+    --mdt-blue: #1f5f8b;
+    --mdt-blue-2: #2a6fa3;
+    --mdt-light-blue: #dcecf8;
+    --mdt-very-light: #f4f9fd;
+    --mdt-border: #c8dced;
+    --mdt-text: #17324d;
+    --mdt-muted: #5f7891;
+    --mdt-white: #ffffff;
+
+    --tier1-bg: #dceeff;
+    --tier1-text: #0d3f66;
+    --tier2-bg: #e7f4ff;
+    --tier2-text: #1c5b89;
+    --tier3-bg: #eef7fb;
+    --tier3-text: #3d6d8d;
+    --tier4-bg: #f3f8fc;
+    --tier4-text: #5d7387;
+
+    --good-bg: #e5f5ea;
+    --good-text: #1f6b42;
+    --bad-bg: #fde8e8;
+    --bad-text: #9b1c1c;
+    --idk-bad-bg: #fff4db;
+    --idk-bad-text: #8a5a00;
+    --idk-good-bg: #edf6ff;
+    --idk-good-text: #245d8a;
+}
+
+.stApp {
+    background: linear-gradient(180deg, #f7fbff 0%, #eef5fb 100%);
+    color: var(--mdt-text);
+}
+
+.block-container {
+    padding-top: 3rem;
+    padding-bottom: 2rem;
+    max-width: 1450px;
+}
+
+h1, h2, h3, h4 {
+    color: var(--mdt-navy);
+    letter-spacing: -0.01em;
+}
+
+h1 {
+    font-weight: 700;
+    margin-bottom: 0.2rem;
+}
+
+p, li, label, div {
+    color: var(--mdt-text);
+}
+
+.small-note {
+    color: var(--mdt-muted);
+    font-size: 0.9rem;
+}
+
+.pretty-section {
+    padding: 0.4rem 0 0.2rem 0;
+    margin-top: 0.5rem;
+}
+
+section[data-testid="stSidebar"] {
+    background: #edf4fa;
+    border-right: 1px solid var(--mdt-border);
+}
+
+div[data-testid="stMetric"] {
+    background: var(--mdt-white);
+    border: 1px solid var(--mdt-border);
+    border-left: 5px solid var(--mdt-blue);
+    border-radius: 12px;
+    padding: 14px 18px;
+    box-shadow: 0 2px 8px rgba(18, 59, 93, 0.06);
+}
+
+div[data-testid="stMetricLabel"] {
+    color: var(--mdt-muted);
+    font-weight: 600;
+}
+
+div[data-testid="stMetricValue"] {
+    color: var(--mdt-navy);
+    font-weight: 700;
+}
+
+div[data-testid="stDataFrame"] {
+    background: var(--mdt-white);
+    border: 1px solid var(--mdt-border);
+    border-radius: 12px;
+    box-shadow: 0 2px 8px rgba(18, 59, 93, 0.04);
+    overflow: hidden;
+}
+
+div[data-testid="stExpander"] {
+    background: var(--mdt-white);
+    border: 1px solid var(--mdt-border);
+    border-radius: 12px;
+}
+
+.stButton > button,
+.stDownloadButton > button {
+    background: linear-gradient(180deg, #2c6f9e 0%, #1f5f8b 100%);
+    color: white;
+    border: 1px solid #1b5379;
+    border-radius: 10px;
+    font-weight: 600;
+    padding: 0.45rem 1rem;
+    box-shadow: 0 2px 6px rgba(18, 59, 93, 0.15);
+}
+
+.stButton > button:hover,
+.stDownloadButton > button:hover {
+    background: linear-gradient(180deg, #255f87 0%, #174867 100%);
+    border: 1px solid #143f5b;
+    color: white;
+}
+
+.stTextInput > div > div,
+.stNumberInput > div > div,
+.stSelectbox > div > div,
+.stMultiSelect > div > div {
+    background-color: var(--mdt-white);
+    border-radius: 10px;
+}
+
+div[data-baseweb="select"] > div {
+    border-color: var(--mdt-border);
+}
+
+input, textarea {
+    color: var(--mdt-text);
+}
+
+div[data-testid="stTabs"] button {
+    color: var(--mdt-navy);
+    font-weight: 600;
+}
+
+div[data-testid="stTabs"] button[aria-selected="true"] {
+    color: var(--mdt-blue);
+}
+
+hr {
+    border: none;
+    border-top: 1px solid var(--mdt-border);
+}
+
+[data-testid="stCaptionContainer"] {
+    color: var(--mdt-muted);
+}
+
+.review-table-wrapper {
+    background: white;
+    border: 1px solid var(--mdt-border);
+    border-radius: 12px;
+    padding: 10px;
+    overflow-x: auto;
+    box-shadow: 0 2px 8px rgba(18, 59, 93, 0.04);
+}
+
+.review-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 0.92rem;
+}
+
+.review-table th {
+    background: #e9f2fa;
+    color: var(--mdt-navy);
+    text-align: left;
+    padding: 10px 12px;
+    border-bottom: 1px solid var(--mdt-border);
+    position: sticky;
+    top: 0;
+}
+
+.review-table td {
+    padding: 10px 12px;
+    border-bottom: 1px solid #edf2f7;
+    vertical-align: top;
+}
+
+.review-table tr:hover {
+    background: #f8fbff;
+}
+
+.badge {
+    display: inline-block;
+    padding: 0.22rem 0.6rem;
+    border-radius: 999px;
+    font-size: 0.82rem;
+    font-weight: 700;
+    white-space: nowrap;
+}
+
+.tier1 { background: var(--tier1-bg); color: var(--tier1-text); }
+.tier2 { background: var(--tier2-bg); color: var(--tier2-text); }
+.tier3 { background: var(--tier3-bg); color: var(--tier3-text); }
+.tier4 { background: var(--tier4-bg); color: var(--tier4-text); }
+
+.good { background: var(--good-bg); color: var(--good-text); }
+.bad { background: var(--bad-bg); color: var(--bad-text); }
+.idk-bad { background: var(--idk-bad-bg); color: var(--idk-bad-text); }
+.idk-good { background: var(--idk-good-bg); color: var(--idk-good-text); }
+</style>
+""", unsafe_allow_html=True)
 
 DEFAULT_BASE_MODELS_URL = "https://api.gpt.medtronic.com/providers/medtronicgpt/models"
 DEFAULT_MODEL_ID = "gpt-41"
@@ -129,11 +348,11 @@ FIRE_KEYWORDS = [
 RAW_REQUIRED_FIELDS = [
     "Product Event ID",
     "Complaint? - PE",
-    "Country - PE",
+    "Country – PE",
     "RFR Code",
     "FDP Code",
-    "Reportable",
-    "Investigation Required",
+    "Reportable?",
+    "Investigation Required?",
     "Event Description - PE",
 ]
 
@@ -177,6 +396,46 @@ uploaded_file = st.file_uploader(
     "Upload an Excel workbook",
     type=["xlsx"],
 )
+
+st.markdown(
+    '<div class="small-note">Upload the raw complaint workbook to run layered screening, MDTGPT consistency review, and tiered prioritization.</div>',
+    unsafe_allow_html=True
+)
+
+if "processed_results" not in st.session_state:
+    st.session_state.processed_results = None
+if "processed_preview_df" not in st.session_state:
+    st.session_state.processed_preview_df = None
+if "processed_workbook_info" not in st.session_state:
+    st.session_state.processed_workbook_info = None
+if "processed_tier_summary_df" not in st.session_state:
+    st.session_state.processed_tier_summary_df = None
+if "processed_organized_results_df" not in st.session_state:
+    st.session_state.processed_organized_results_df = None
+if "processed_clean_display_df" not in st.session_state:
+    st.session_state.processed_clean_display_df = None
+if "processed_pretty_review_df" not in st.session_state:
+    st.session_state.processed_pretty_review_df = None
+if "processed_html_review_df" not in st.session_state:
+    st.session_state.processed_html_review_df = None
+if "processed_results_xlsx" not in st.session_state:
+    st.session_state.processed_results_xlsx = None
+if "last_uploaded_filename" not in st.session_state:
+    st.session_state.last_uploaded_filename = None
+
+if uploaded_file is not None:
+    current_uploaded_name = uploaded_file.name
+    if st.session_state.last_uploaded_filename != current_uploaded_name:
+        st.session_state.processed_results = None
+        st.session_state.processed_preview_df = None
+        st.session_state.processed_workbook_info = None
+        st.session_state.processed_tier_summary_df = None
+        st.session_state.processed_organized_results_df = None
+        st.session_state.processed_clean_display_df = None
+        st.session_state.processed_pretty_review_df = None
+        st.session_state.processed_html_review_df = None
+        st.session_state.processed_results_xlsx = None
+        st.session_state.last_uploaded_filename = current_uploaded_name
 
 def normalize_text(value):
     if value is None or (isinstance(value, float) and math.isnan(value)):
@@ -232,6 +491,17 @@ def get_value(row_dict, *keys):
         if key in row_dict and row_dict[key] not in (None, "", "nan"):
             return row_dict[key]
     return None
+
+def get_country_value(row_dict):
+    return safe_text(get_value(
+        row_dict,
+        "Country - PE",
+        "Country – PE",
+        "Country — PE",
+        "Country-PE",
+        "Country PE",
+        "Country",
+    ))
 
 def value_to_id_text(value):
     if value is None or pd.isna(value):
@@ -546,49 +816,6 @@ def any_regional_fer_yes(row_dict):
     fer_fields = ["Brazil FER", "China FER", "Japan FER", "Korea FER"]
     return any(yes_like(row_dict.get(field)) for field in fer_fields)
 
-def build_tier_organization(results_df):
-    if results_df.empty:
-        return pd.DataFrame(), pd.DataFrame()
-
-    working_df = results_df.copy()
-
-    if "priority_tier" in working_df.columns:
-        working_df["priority_tier_num"] = pd.to_numeric(working_df["priority_tier"], errors="coerce")
-    else:
-        working_df["priority_tier_num"] = None
-
-    if "priority_score" in working_df.columns:
-        working_df["priority_score_num"] = pd.to_numeric(working_df["priority_score"], errors="coerce")
-    else:
-        working_df["priority_score_num"] = None
-
-    organized_df = working_df.sort_values(
-        by=["priority_tier_num", "priority_score_num", "row_number"],
-        ascending=[True, False, True],
-        na_position="last",
-    ).copy()
-
-    tier_summary_df = (
-        organized_df.groupby("priority_tier_num", dropna=False)
-        .agg(
-            complaint_count=("row_number", "count"),
-            avg_priority_score=("priority_score_num", "mean"),
-            high_concern_count=("concern_level", lambda x: (x.astype(str).str.lower() == "high").sum()),
-            medium_concern_count=("concern_level", lambda x: (x.astype(str).str.lower() == "medium").sum()),
-            low_concern_count=("concern_level", lambda x: (x.astype(str).str.lower() == "low").sum()),
-            layer2_flag_yes_count=("layer2_flag", lambda x: (x.astype(str).str.lower() == "yes").sum()),
-            successful_api_calls=("success", lambda x: (x.astype(bool)).sum()),
-            failed_api_calls=("success", lambda x: (~x.astype(bool)).sum()),
-        )
-        .reset_index()
-        .rename(columns={"priority_tier_num": "priority_tier"})
-    )
-
-    if "avg_priority_score" in tier_summary_df.columns:
-        tier_summary_df["avg_priority_score"] = tier_summary_df["avg_priority_score"].round(2)
-
-    return organized_df, tier_summary_df
-
 def layer1_rule_based_screening(row_dict):
     flags = []
     reasons = []
@@ -604,8 +831,8 @@ def layer1_rule_based_screening(row_dict):
     summary_results = safe_text(row_dict.get("Summary of Investigation Results"))
     rfr_code = safe_text(row_dict.get("RFR Code"))
     fdp_code = safe_text(row_dict.get("FDP Code"))
-    reportable = row_dict.get("Reportable")
-    investigation_required = row_dict.get("Investigation Required")
+    reportable = row_dict.get("Reportable?")
+    investigation_required = row_dict.get("Investigation Required?")
 
     keyword_scan_text = collect_text_for_keyword_scan(row_dict)
 
@@ -741,6 +968,37 @@ def parse_layer2_response(response_body):
         pass
 
     return parse_key_value_text(content)
+
+def build_exact_inconsistency_found(layer2_result, row_dict):
+    event_flag = str(layer2_result.get("coding_event_description_inconsistency", "")).strip().lower() == "yes"
+    reg_flag = str(layer2_result.get("coding_regulatory_decision_inconsistency", "")).strip().lower() == "yes"
+    inv_flag = str(layer2_result.get("coding_investigation_decision_inconsistency", "")).strip().lower() == "yes"
+
+    flagged_areas = []
+
+    if event_flag:
+        flagged_areas.append("event description")
+    if reg_flag:
+        flagged_areas.append("regulatory decision")
+    if inv_flag:
+        flagged_areas.append("investigation decision")
+
+    if not flagged_areas:
+        return ""
+
+    rfr_code = safe_text(row_dict.get("RFR Code"))
+    fdp_code = safe_text(row_dict.get("FDP Code"))
+
+    code_parts = []
+    if rfr_code:
+        code_parts.append(f'RFR "{rfr_code}"')
+    if fdp_code:
+        code_parts.append(f'FDP "{fdp_code}"')
+
+    if code_parts:
+        coding_text = " and ".join(code_parts)
+        return f"Assigned coding ({coding_text}) does not align with the {', '.join(flagged_areas)}."
+    return f"Assigned coding does not align with the {', '.join(flagged_areas)}."
 
 def layer3_prioritization(layer1_result, layer2_result):
     score = layer1_result.get("layer1_score", 0)
@@ -947,6 +1205,191 @@ def build_clear_categorization(layer1_result, layer2_result, layer3_result, row_
         "inconsistency_types": " | ".join(inconsistency_types),
     }
 
+def build_overall_judgment(row):
+    concern = str(row.get("concern_level", "")).strip().lower()
+    tier = pd.to_numeric(row.get("priority_tier"), errors="coerce")
+
+    yes_count = 0
+    for col in [
+        "coding_event_description_inconsistency",
+        "coding_regulatory_decision_inconsistency",
+        "coding_investigation_decision_inconsistency",
+    ]:
+        if str(row.get(col, "")).strip().lower() == "yes":
+            yes_count += 1
+
+    if concern == "high" or yes_count >= 2 or tier == 1:
+        return "Bad"
+    if concern == "medium" or yes_count == 1 or tier == 2:
+        return "IDK - Leaning Bad"
+    if concern == "low" or tier == 3:
+        return "IDK - Leaning Good"
+    return "Good"
+
+def format_tier_label(value):
+    tier = pd.to_numeric(value, errors="coerce")
+    if pd.isna(tier):
+        return "Unknown"
+    tier = int(tier)
+    return TIER_LABELS.get(tier, f"Tier {tier}")
+
+def build_pretty_review_df(results_df):
+    if results_df.empty:
+        return pd.DataFrame()
+
+    df = results_df.copy()
+    df["priority_tier"] = pd.to_numeric(df.get("priority_tier"), errors="coerce")
+    df["priority_score"] = pd.to_numeric(df.get("priority_score"), errors="coerce")
+    df["overall_judgment"] = df.apply(build_overall_judgment, axis=1)
+    df["tier_label"] = df["priority_tier"].apply(format_tier_label)
+
+    display_cols = [
+        "row_number",
+        "product_event_id",
+        "pe_pli_number",
+        "tier_label",
+        "priority_score",
+        "overall_judgment",
+        "concern_level",
+        "reportable",
+        "investigation_required",
+        "coding_event_description_inconsistency",
+        "coding_regulatory_decision_inconsistency",
+        "coding_investigation_decision_inconsistency",
+        "category_short_reason",
+        "exact_inconsistency_found",
+        "recommended_action",
+        "country",
+        "rfr_code",
+        "fdp_code",
+    ]
+
+    display_cols = [c for c in display_cols if c in df.columns]
+    df = df[display_cols].copy()
+
+    return df.rename(columns={
+        "row_number": "Row Number",
+        "product_event_id": "Product Event ID",
+        "pe_pli_number": "PE - PLI #",
+        "tier_label": "Tier",
+        "priority_score": "Priority Score",
+        "overall_judgment": "Overall Judgment",
+        "concern_level": "Concern Level",
+        "reportable": "Reportable",
+        "investigation_required": "Investigation Required",
+        "coding_event_description_inconsistency": "Event Description Inconsistency",
+        "coding_regulatory_decision_inconsistency": "Regulatory Inconsistency",
+        "coding_investigation_decision_inconsistency": "Investigation Inconsistency",
+        "category_short_reason": "Short Reason",
+        "exact_inconsistency_found": "Exact Inconsistency Found",
+        "recommended_action": "Recommended Action",
+        "country": "Country",
+        "rfr_code": "RFR Code",
+        "fdp_code": "FDP Code",
+    })
+
+def count_by_tier(results_df, tier_num):
+    if results_df.empty or "priority_tier" not in results_df.columns:
+        return 0
+    return int((pd.to_numeric(results_df["priority_tier"], errors="coerce") == tier_num).sum())
+
+def tier_badge_html(tier_label):
+    text = str(tier_label)
+    if "Tier 1" in text:
+        css_class = "tier1"
+    elif "Tier 2" in text:
+        css_class = "tier2"
+    elif "Tier 3" in text:
+        css_class = "tier3"
+    elif "Tier 4" in text:
+        css_class = "tier4"
+    else:
+        css_class = "tier4"
+    return f'<span class="badge {css_class}">{text}</span>'
+
+def judgment_badge_html(judgment):
+    text = str(judgment)
+    if text == "Bad":
+        css_class = "bad"
+    elif text == "Good":
+        css_class = "good"
+    elif text == "IDK - Leaning Bad":
+        css_class = "idk-bad"
+    else:
+        css_class = "idk-good"
+    return f'<span class="badge {css_class}">{text}</span>'
+
+def build_html_review_df(results_df):
+    if results_df.empty:
+        return pd.DataFrame()
+
+    df = results_df.copy()
+    df["priority_tier"] = pd.to_numeric(df.get("priority_tier"), errors="coerce")
+    df["priority_score"] = pd.to_numeric(df.get("priority_score"), errors="coerce")
+    df["overall_judgment"] = df.apply(build_overall_judgment, axis=1)
+    df["tier_label"] = df["priority_tier"].apply(format_tier_label)
+
+    display_cols = [
+        "row_number",
+        "product_event_id",
+        "pe_pli_number",
+        "tier_label",
+        "priority_score",
+        "overall_judgment",
+        "concern_level",
+        "reportable",
+        "investigation_required",
+        "coding_event_description_inconsistency",
+        "coding_regulatory_decision_inconsistency",
+        "coding_investigation_decision_inconsistency",
+        "category_short_reason",
+        "exact_inconsistency_found",
+        "recommended_action",
+        "country",
+        "rfr_code",
+        "fdp_code",
+    ]
+
+    display_cols = [c for c in display_cols if c in df.columns]
+    df = df[display_cols].copy()
+
+    df = df.rename(columns={
+        "row_number": "Row Number",
+        "product_event_id": "Product Event ID",
+        "pe_pli_number": "PE - PLI #",
+        "tier_label": "Tier",
+        "priority_score": "Priority Score",
+        "overall_judgment": "Overall Judgment",
+        "concern_level": "Concern Level",
+        "reportable": "Reportable",
+        "investigation_required": "Investigation Required",
+        "coding_event_description_inconsistency": "Event Description Inconsistency",
+        "coding_regulatory_decision_inconsistency": "Regulatory Inconsistency",
+        "coding_investigation_decision_inconsistency": "Investigation Inconsistency",
+        "category_short_reason": "Short Reason",
+        "exact_inconsistency_found": "Exact Inconsistency Found",
+        "recommended_action": "Recommended Action",
+        "country": "Country",
+        "rfr_code": "RFR Code",
+        "fdp_code": "FDP Code",
+    })
+
+    if "Tier" in df.columns:
+        df["Tier"] = df["Tier"].apply(tier_badge_html)
+
+    if "Overall Judgment" in df.columns:
+        df["Overall Judgment"] = df["Overall Judgment"].apply(judgment_badge_html)
+
+    return df
+
+def render_html_table(df):
+    if df.empty:
+        st.info("No rows to display.")
+        return
+
+    html = df.to_html(index=False, escape=False, classes="review-table")
+    st.markdown(f'<div class="review-table-wrapper">{html}</div>', unsafe_allow_html=True)
+
 def build_clean_display_df(results_df):
     if results_df.empty:
         return pd.DataFrame()
@@ -980,6 +1423,7 @@ def build_clean_display_df(results_df):
         "priority_score",
         "recommended_action",
         "category_short_reason",
+        "exact_inconsistency_found",
         "category_detailed_reason",
         "concern_level",
         "layer2_flag",
@@ -1020,6 +1464,7 @@ def build_clean_display_df(results_df):
         "priority_score": "Priority Score",
         "recommended_action": "Recommended Action",
         "category_short_reason": "Short Categorization Reason",
+        "exact_inconsistency_found": "Exact Inconsistency Found",
         "category_detailed_reason": "Detailed Categorization Reason",
         "concern_level": "Concern Level",
         "layer2_flag": "Layer 2 Flag",
@@ -1043,7 +1488,187 @@ def build_clean_display_df(results_df):
 
     return display_df.rename(columns=rename_map)
 
+def build_tier_organization(results_df):
+    """
+    Organize model results by QA review priority tier.
+
+    Returns:
+        organized_results_df:
+            Full results sorted by priority tier, concern level, score, and row number.
+
+        tier_organization_summary_df:
+            Summary table showing counts and review distribution by tier.
+
+    This function is defensive so the app will not fail if a column is missing.
+    """
+
+    if results_df is None or results_df.empty:
+        return pd.DataFrame(), pd.DataFrame()
+
+    organized_df = results_df.copy()
+
+    if "priority_tier" not in organized_df.columns:
+        organized_df["priority_tier"] = None
+
+    if "priority_score" not in organized_df.columns:
+        organized_df["priority_score"] = None
+
+    if "concern_level" not in organized_df.columns:
+        organized_df["concern_level"] = ""
+
+    if "inconsistency_count" not in organized_df.columns:
+        organized_df["inconsistency_count"] = 0
+
+    if "row_number" not in organized_df.columns:
+        organized_df["row_number"] = range(1, len(organized_df) + 1)
+
+    organized_df["priority_tier"] = pd.to_numeric(
+        organized_df["priority_tier"],
+        errors="coerce"
+    )
+
+    organized_df["priority_score"] = pd.to_numeric(
+        organized_df["priority_score"],
+        errors="coerce"
+    )
+
+    organized_df["inconsistency_count"] = pd.to_numeric(
+        organized_df["inconsistency_count"],
+        errors="coerce"
+    ).fillna(0)
+
+    organized_df["row_number"] = pd.to_numeric(
+        organized_df["row_number"],
+        errors="coerce"
+    )
+
+    concern_rank_map = {
+        "high": 1,
+        "medium": 2,
+        "low": 3,
+        "": 4,
+        "none": 4,
+        "nan": 4,
+    }
+
+    organized_df["_concern_rank"] = (
+        organized_df["concern_level"]
+        .astype(str)
+        .str.strip()
+        .str.lower()
+        .map(concern_rank_map)
+        .fillna(4)
+    )
+
+    organized_df["_priority_tier_sort"] = organized_df["priority_tier"].fillna(999)
+    organized_df["_priority_score_sort"] = organized_df["priority_score"].fillna(-999)
+    organized_df["_row_number_sort"] = organized_df["row_number"].fillna(999999)
+
+    organized_df = organized_df.sort_values(
+        by=[
+            "_priority_tier_sort",
+            "_concern_rank",
+            "_priority_score_sort",
+            "inconsistency_count",
+            "_row_number_sort",
+        ],
+        ascending=[
+            True,
+            True,
+            False,
+            False,
+            True,
+        ],
+        na_position="last",
+    ).reset_index(drop=True)
+
+    organized_df["review_order"] = range(1, len(organized_df) + 1)
+
+    organized_df["tier_review_rank"] = (
+        organized_df
+        .groupby("priority_tier", dropna=False)
+        .cumcount() + 1
+    )
+
+    organized_df["tier_label"] = organized_df["priority_tier"].apply(format_tier_label)
+
+    if "overall_judgment" not in organized_df.columns:
+        organized_df["overall_judgment"] = organized_df.apply(build_overall_judgment, axis=1)
+
+    tier_organization_summary_df = (
+        organized_df
+        .groupby(["priority_tier", "tier_label"], dropna=False)
+        .agg(
+            row_count=("row_number", "count"),
+            avg_priority_score=("priority_score", "mean"),
+            max_priority_score=("priority_score", "max"),
+            min_priority_score=("priority_score", "min"),
+            high_concern_count=(
+                "concern_level",
+                lambda x: (x.astype(str).str.strip().str.lower() == "high").sum()
+            ),
+            medium_concern_count=(
+                "concern_level",
+                lambda x: (x.astype(str).str.strip().str.lower() == "medium").sum()
+            ),
+            low_concern_count=(
+                "concern_level",
+                lambda x: (x.astype(str).str.strip().str.lower() == "low").sum()
+            ),
+            bad_count=(
+                "overall_judgment",
+                lambda x: (x.astype(str).str.strip() == "Bad").sum()
+            ),
+            idk_leaning_bad_count=(
+                "overall_judgment",
+                lambda x: (x.astype(str).str.strip() == "IDK - Leaning Bad").sum()
+            ),
+            idk_leaning_good_count=(
+                "overall_judgment",
+                lambda x: (x.astype(str).str.strip() == "IDK - Leaning Good").sum()
+            ),
+            good_count=(
+                "overall_judgment",
+                lambda x: (x.astype(str).str.strip() == "Good").sum()
+            ),
+        )
+        .reset_index()
+    )
+
+    tier_organization_summary_df["avg_priority_score"] = (
+        tier_organization_summary_df["avg_priority_score"].round(2)
+    )
+
+    tier_organization_summary_df = tier_organization_summary_df.rename(columns={
+        "priority_tier": "Priority Tier",
+        "tier_label": "Tier",
+        "row_count": "Row Count",
+        "avg_priority_score": "Average Priority Score",
+        "max_priority_score": "Max Priority Score",
+        "min_priority_score": "Min Priority Score",
+        "high_concern_count": "High Concern Count",
+        "medium_concern_count": "Medium Concern Count",
+        "low_concern_count": "Low Concern Count",
+        "bad_count": "Bad Count",
+        "idk_leaning_bad_count": "IDK - Leaning Bad Count",
+        "idk_leaning_good_count": "IDK - Leaning Good Count",
+        "good_count": "Good Count",
+    })
+
+    organized_df = organized_df.drop(
+        columns=[
+            "_concern_rank",
+            "_priority_tier_sort",
+            "_priority_score_sort",
+            "_row_number_sort",
+        ],
+        errors="ignore",
+    )
+
+    return organized_df, tier_organization_summary_df
+
 def build_enhanced_tier_summary(results_df):
+
     if results_df.empty:
         return pd.DataFrame()
 
@@ -1091,6 +1716,7 @@ def make_results_xlsx_bytes(
     tier_summary_df=None,
     organized_results_df=None,
     clean_display_df=None,
+    pretty_review_df=None,
 ):
     output = io.BytesIO()
 
@@ -1098,6 +1724,7 @@ def make_results_xlsx_bytes(
         export_df = df.copy()
         for col in export_df.columns:
             export_df[col] = export_df[col].map(clean_excel_cell_value)
+
         export_df.to_excel(writer, sheet_name=sheet_name[:31], index=False)
         worksheet = writer.sheets[sheet_name[:31]]
         worksheet.freeze_panes = "A2"
@@ -1105,14 +1732,20 @@ def make_results_xlsx_bytes(
 
         for col_idx, column_name in enumerate(export_df.columns, start=1):
             letter = worksheet.cell(row=1, column=col_idx).column_letter
-            sample_values = export_df[column_name].astype(str).head(50).tolist()
-            max_len = max([len(str(column_name))] + [len(v) for v in sample_values])
+            sample_values = export_df[column_name].head(50).tolist()
+            max_len = max(
+                [len(str(column_name))] +
+                [len("" if pd.isna(v) else str(v)) for v in sample_values]
+            )
             worksheet.column_dimensions[letter].width = min(max(max_len + 2, 12), 70)
 
     with pd.ExcelWriter(output, engine="openpyxl") as writer:
         pd.DataFrame({"status": ["results workbook"]}).to_excel(writer, sheet_name="README", index=False)
 
         write_sheet(writer, results_df, "Model Results")
+
+        if pretty_review_df is not None and not pretty_review_df.empty:
+            write_sheet(writer, pretty_review_df, "Reviewer View")
 
         if clean_display_df is not None and not clean_display_df.empty:
             write_sheet(writer, clean_display_df, "Categorized Complaints")
@@ -1137,6 +1770,83 @@ def make_results_xlsx_bytes(
 
     output.seek(0)
     return output.getvalue()
+
+def render_saved_results():
+    if st.session_state.processed_organized_results_df is None:
+        return
+
+    organized_results_df = st.session_state.processed_organized_results_df
+    clean_display_df = st.session_state.processed_clean_display_df
+    tier_summary_df = st.session_state.processed_tier_summary_df
+
+    st.markdown('<div class="pretty-section"></div>', unsafe_allow_html=True)
+    col1, col2, col3, col4, col5 = st.columns(5)
+    col1.metric("Total Rows", len(organized_results_df))
+    col2.metric("Tier 1", count_by_tier(organized_results_df, 1))
+    col3.metric("Tier 2", count_by_tier(organized_results_df, 2))
+    col4.metric("Tier 3", count_by_tier(organized_results_df, 3))
+    col5.metric("Tier 4", count_by_tier(organized_results_df, 4))
+
+    tab1, tab2, tab3 = st.tabs(["Overview", "Tiered Review", "Raw Results"])
+
+    with tab1:
+        st.subheader("Tier Summary")
+        st.dataframe(tier_summary_df, use_container_width=True)
+
+        st.subheader("Review Table")
+        st.markdown(
+            '<div class="small-note">Compact reviewer-friendly view with color-coded tiers and judgments.</div>',
+            unsafe_allow_html=True
+        )
+
+        tier_filter = st.multiselect(
+            "Filter by Tier",
+            options=list(TIER_LABELS.values()),
+            default=[],
+            key="overview_tier_filter"
+        )
+
+        filtered_base_df = organized_results_df.copy()
+        if tier_filter:
+            allowed_tiers = [
+                tier_num for tier_num, tier_name in TIER_LABELS.items()
+                if tier_name in tier_filter
+            ]
+            filtered_base_df = filtered_base_df[
+                pd.to_numeric(filtered_base_df["priority_tier"], errors="coerce").isin(allowed_tiers)
+            ].copy()
+
+        filtered_html_df = build_html_review_df(filtered_base_df)
+        render_html_table(filtered_html_df)
+
+    with tab2:
+        for tier in [1, 2, 3, 4]:
+            tier_raw_df = organized_results_df[
+                pd.to_numeric(organized_results_df["priority_tier"], errors="coerce") == tier
+            ].copy()
+
+            if not tier_raw_df.empty:
+                tier_name = TIER_LABELS.get(tier, f"Tier {tier}")
+                st.subheader(tier_name)
+                tier_html_df = build_html_review_df(tier_raw_df)
+                render_html_table(tier_html_df)
+
+    with tab3:
+        st.subheader("Full Raw Categorized Output")
+        st.markdown(
+            '<div class="small-note">This includes all detailed fields used for traceability and debugging.</div>',
+            unsafe_allow_html=True
+        )
+        st.dataframe(clean_display_df, use_container_width=True, height=600)
+
+    if st.session_state.processed_results_xlsx is not None:
+        st.download_button(
+            "Download results workbook as XLSX",
+            data=st.session_state.processed_results_xlsx,
+            file_name="mdtgpt_raw_model_results.xlsx",
+            mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+            key="persistent_download_button"
+        )
 
 if uploaded_file is not None:
     try:
@@ -1224,12 +1934,12 @@ if uploaded_file is not None:
                         "product_event_id": row_dict.get("Product Event ID"),
                         "pe_pli_number": row_dict.get("PE - PLI #"),
                         "complaint_indicator": row_dict.get("Complaint? - PE"),
-                        "country": row_dict.get("Country - PE"),
+                        "country": get_country_value(row_dict),
                         "product_description": row_dict.get("Product Description - PE PLI"),
                         "rfr_code": row_dict.get("RFR Code"),
                         "fdp_code": row_dict.get("FDP Code"),
-                        "reportable": row_dict.get("Reportable"),
-                        "investigation_required": row_dict.get("Investigation Required"),
+                        "reportable": row_dict.get("Reportable?"),
+                        "investigation_required": row_dict.get("Investigation Required?"),
                         "event_description": row_dict.get("Event Description - PE"),
                         "investigation_summary": row_dict.get("Summary of Investigation Results"),
                         "status_code": response.status_code,
@@ -1282,6 +1992,7 @@ if uploaded_file is not None:
                     result_record["recommended_action"] = categorization_result["recommended_action"]
                     result_record["inconsistency_count"] = categorization_result["inconsistency_count"]
                     result_record["inconsistency_types"] = categorization_result["inconsistency_types"]
+                    result_record["exact_inconsistency_found"] = build_exact_inconsistency_found(layer2_result, row_dict)
 
                     if response.ok:
                         success_count += 1
@@ -1297,12 +2008,12 @@ if uploaded_file is not None:
                         "product_event_id": row_dict.get("Product Event ID"),
                         "pe_pli_number": row_dict.get("PE - PLI #"),
                         "complaint_indicator": row_dict.get("Complaint? - PE"),
-                        "country": row_dict.get("Country - PE"),
+                        "country": get_country_value(row_dict),
                         "product_description": row_dict.get("Product Description - PE PLI"),
                         "rfr_code": row_dict.get("RFR Code"),
                         "fdp_code": row_dict.get("FDP Code"),
-                        "reportable": row_dict.get("Reportable"),
-                        "investigation_required": row_dict.get("Investigation Required"),
+                        "reportable": row_dict.get("Reportable?"),
+                        "investigation_required": row_dict.get("Investigation Required?"),
                         "event_description": row_dict.get("Event Description - PE"),
                         "investigation_summary": row_dict.get("Summary of Investigation Results"),
                         "status_code": None,
@@ -1336,6 +2047,7 @@ if uploaded_file is not None:
                         "recommended_action": "Manual review required",
                         "inconsistency_count": None,
                         "inconsistency_types": None,
+                        "exact_inconsistency_found": None,
                     })
 
                 percent_complete = int((processed_index / len(main_df)) * 100)
@@ -1350,27 +2062,11 @@ if uploaded_file is not None:
             st.write(f"Failed rows: {failure_count}")
 
             results_df = pd.DataFrame(results)
-
             organized_results_df, _ = build_tier_organization(results_df)
             clean_display_df = build_clean_display_df(organized_results_df)
             tier_summary_df = build_enhanced_tier_summary(organized_results_df)
-
-            st.subheader("Tier Summary")
-            st.dataframe(tier_summary_df, use_container_width=True)
-
-            st.subheader("All Product Events Categorized")
-            st.dataframe(clean_display_df, use_container_width=True)
-
-            for tier in [1, 2, 3, 4]:
-                tier_raw_df = organized_results_df[
-                    pd.to_numeric(organized_results_df["priority_tier"], errors="coerce") == tier
-                ].copy()
-
-                if not tier_raw_df.empty:
-                    tier_clean_df = build_clean_display_df(tier_raw_df)
-                    tier_name = TIER_LABELS.get(tier, f"Tier {tier}")
-                    st.subheader(tier_name)
-                    st.dataframe(tier_clean_df, use_container_width=True)
+            pretty_review_df = build_pretty_review_df(organized_results_df)
+            html_review_df = build_html_review_df(organized_results_df)
 
             results_xlsx = make_results_xlsx_bytes(
                 results_df=results_df,
@@ -1379,14 +2075,20 @@ if uploaded_file is not None:
                 tier_summary_df=tier_summary_df,
                 organized_results_df=organized_results_df,
                 clean_display_df=clean_display_df,
+                pretty_review_df=pretty_review_df,
             )
 
-            st.download_button(
-                "Download results workbook as XLSX",
-                data=results_xlsx,
-                file_name="mdtgpt_raw_model_results.xlsx",
-                mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-            )
+            st.session_state.processed_results = results_df
+            st.session_state.processed_preview_df = preview_df
+            st.session_state.processed_workbook_info = workbook_info
+            st.session_state.processed_tier_summary_df = tier_summary_df
+            st.session_state.processed_organized_results_df = organized_results_df
+            st.session_state.processed_clean_display_df = clean_display_df
+            st.session_state.processed_pretty_review_df = pretty_review_df
+            st.session_state.processed_html_review_df = html_review_df
+            st.session_state.processed_results_xlsx = results_xlsx
+
+        render_saved_results()
 
     except Exception as e:
         st.error(f"Failed to read or process the workbook: {e}")
