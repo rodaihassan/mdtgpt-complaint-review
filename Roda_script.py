@@ -315,6 +315,32 @@ TIER_LABELS = {
     4: "Tier 4 - No Review Signal",
 }
 
+PORTFOLIO_OU_MAP = {
+    "Cardiovascular Portfolio": [
+        "Cardiac Ablation Solutions",
+        "Cardiac Rhythm Management",
+        "Cardiac Surgery",
+        "Coronary and Renal Denervation",
+        "Mechanical Circulatory Support",
+        "Structural Heart and Aortic",
+        "Peripheral Vascular Health",
+    ],
+    "Neuroscience Portfolio": [
+        "Cranial and Spinal Technologies",
+        "Ear, Nose, and Throat",
+        "Neuromodulation",
+        "Neurovascular",
+        "Pelvic Health",
+    ],
+    "Medical Surgical Portfolio": [
+        "Acute Care & Monitoring",
+        "Endoscopy",
+        "Renal Care Solutions",
+        "Surgical",
+        "Ventilation Service Solutions",
+    ],
+}
+
 DEATH_KEYWORDS = [
     "death",
     "died",
@@ -400,6 +426,24 @@ uploaded_file = st.file_uploader(
 st.markdown(
     '<div class="small-note">Upload the raw complaint workbook to run layered screening, MDTGPT consistency review, and tiered prioritization.</div>',
     unsafe_allow_html=True
+)
+
+st.subheader("Portfolio Selection")
+
+selected_portfolio = st.selectbox(
+    "Select Portfolio",
+    options=["Select Portfolio"] + list(PORTFOLIO_OU_MAP.keys()),
+    index=0,
+)
+
+selected_ou_options = ["Select OU"]
+if selected_portfolio in PORTFOLIO_OU_MAP:
+    selected_ou_options += PORTFOLIO_OU_MAP[selected_portfolio]
+
+selected_ou = st.selectbox(
+    "Select Operating Unit (OU)",
+    options=selected_ou_options,
+    index=0,
 )
 
 if "processed_results" not in st.session_state:
@@ -1894,6 +1938,10 @@ if uploaded_file is not None:
 
         if st.button("Send rows to MDTGPT Model"):
             errors = []
+            if selected_portfolio == "Select Portfolio":
+                errors.append("Please select a Portfolio.")
+            if selected_ou == "Select OU":
+                errors.append("Please select an Operating Unit (OU).")
             if not base_models_url:
                 errors.append("Please enter the MDTGPT Models Base URL.")
             if not model_id:
