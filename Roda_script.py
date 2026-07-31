@@ -11,14 +11,53 @@ import pandas as pd
 import requests
 import streamlit as st
 
+def format_month_day_year(dt):
+    return dt.strftime("%B ") + str(dt.day) + dt.strftime(", %Y")
+
+def get_last_updated_from_github():
+    repo_slug = os.getenv("GITHUB_REPOSITORY", "").strip()
+    owner = ""
+    repo = ""
+
+    if repo_slug and "/" in repo_slug:
+        owner, repo = repo_slug.split("/", 1)
+    else:
+        owner = os.getenv("GITHUB_OWNER", "").strip()
+        repo = os.getenv("GITHUB_REPO", "").strip()
+
+    branch = os.getenv("GITHUB_BRANCH", "main").strip()
+    token = os.getenv("GITHUB_TOKEN", "").strip()
+
+    if not owner or not repo:
+        return "Unknown"
+
+    url = f"https://api.github.com/repos/{owner}/{repo}/commits/{branch}"
+    headers = {"Accept": "application/vnd.github+json"}
+
+    if token:
+        headers["Authorization"] = f"Bearer {token}"
+
+    try:
+        response = requests.get(url, headers=headers, timeout=15)
+        response.raise_for_status()
+        data = response.json()
+        date_str = data["commit"]["committer"]["date"]
+        dt = datetime.fromisoformat(date_str.replace("Z", "+00:00"))
+        return format_month_day_year(dt)
+    except Exception:
+        return "Unknown"
+
 st.set_page_config(
     page_title="QA Monitoring Tool",
     layout="wide",
     initial_sidebar_state="expanded",
 )
 
+last_updated = get_last_updated_from_github()
+
 st.title("QA Monitoring Tool")
-st.caption("Raw complaint review prioritization for QA monitoring")
+st.caption(f"Raw complaint review prioritization for QA monitoring | Last Updated: {last_updated}")
+
 
 st.markdown("""
 <style>
@@ -481,13 +520,30 @@ if uploaded_file is not None:
         st.session_state.processed_results_xlsx = None
         st.session_state.last_uploaded_filename = current_uploaded_name
 
+DASH_TRANSLATION = str.maketrans({
+    "\u2010": "-",
+    "\u2011": "-",
+    "\u2012": "-",
+    "\u2013": "-",
+    "\u2014": "-",
+    "\u2212": "-", 
+})
+ 
+ 
 def normalize_text(value):
-    if value is None or (isinstance(value, float) and math.isnan(value)):
+    if value is None or (
+        isinstance(value, float) and math.isnan(value)
+    ):
         return ""
-    return re.sub(r"\s+", " ", str(value).strip().lower().replace("_", " "))
-
+ 
+    text = str(value).translate(DASH_TRANSLATION)
+    text = text.strip().lower().replace("_", " ")
+    return re.sub(r"\s+", " ", text)
+ 
+ 
 def normalize_column_label(value):
     label = "" if value is None else str(value)
+    label = label.translate(DASH_TRANSLATION)
     label = re.sub(r"\s+", " ", label).strip()
     label = label.replace(" :", ":")
     return label
@@ -1976,7 +2032,12 @@ if uploaded_file is not None:
                         complaint_record=complaint_record,
                         timeout=int(timeout_seconds),
                     )
-
+                    if not response.ok:
+                        raise RuntimeError(
+                        f"MDTGPT returned HTTP {response.status_code} for Excel row "
+                        f"{row_number}: {response.text[:1500]}"
+                    )
+ 
                     result_record = {
                         "row_number": row_number,
                         "product_event_id": row_dict.get("Product Event ID"),
