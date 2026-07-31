@@ -11,6 +11,10 @@ import pandas as pd
 import requests
 import streamlit as st
 
+import subprocess 
+from pathlib import Path 
+from zoneinfo import ZoneInfo
+
 def format_month_day_year(dt):
     return dt.strftime("%B ") + str(dt.day) + dt.strftime(", %Y")
 
@@ -55,9 +59,35 @@ st.set_page_config(
 
 last_updated = get_last_updated_from_github()
 
-st.title("QA Monitoring Tool")
-st.caption(f"Raw complaint review prioritization for QA monitoring | Last Updated: {last_updated}")
+def get_last_updated():
+     try:
+         script_path = Path(__file__).resolve()
+         commit_time = subprocess.check_output(
+             [
+                 "git",
+                 "log",
+                 "-1",
+                 "--format=%cI",
+                 "--",
+                 script_path.name,
+             ],
+             cwd=script_path.parent,
+             text=True,
+             stderr=subprocess.DEVNULL,
+         ).strip()
+         updated = datetime.fromisoformat(commit_time)
+         updated = updated.astimezone(ZoneInfo("America/Chicago"))
+         return updated.strftime("%B %d, %Y at %I:%M %p %Z")
+     except Exception:
+         updated = datetime.fromtimestamp(
+             Path(__file__).stat().st_mtime,
+             tz=ZoneInfo("America/Chicago"),
+         )
+         return updated.strftime("%B %d, %Y at %I:%M %p %Z")
 
+st.title("QA Monitoring Tool")
+st.caption(f"Raw complaint review prioritization for QA monitoring")
+st.caption(f"Last updated: {get_last_updated()}")
 
 st.markdown("""
 <style>
