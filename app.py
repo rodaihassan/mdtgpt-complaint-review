@@ -3,7 +3,6 @@ import json
 import math
 import os
 import re
-import threading
 import zipfile
 from datetime import date, datetime
 from xml.etree import ElementTree as ET
