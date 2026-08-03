@@ -463,9 +463,10 @@ model_id = st.text_input(
 )
 
 bearer_token = st.text_input(
-    "Bearer Token",
-    value=os.getenv("MDTGPT_API_TOKEN", ""),
+    "MDTGPT Bearer Token",
+    value="",
     type="password",
+    help="Enter your authorized MDTGPT token. It is used only for this Streamlit session.",
 )
 
 timeout_seconds = st.number_input(
