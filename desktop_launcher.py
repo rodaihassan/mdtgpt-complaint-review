@@ -2,7 +2,6 @@ import ctypes
 import os
 import socket
 import sys
-import threading
 import traceback
 import time
 import webbrowser
@@ -138,30 +137,7 @@ def main():
 
 
 if __name__ == "__main__":
-    try:
-        main()
-    except Exception:
-        error_details = traceback.format_exc()
-        error_file = (
-            Path(sys.executable).resolve().parent
-            / "startup-error.txt"
-        )
-
-        try:
-            error_file.write_text(
-                error_details,
-                encoding="utf-8",
-            )
-        except Exception:
-            pass
-
-        show_message(
-            "QA Monitoring Tool",
-            (
-                "The application could not start.\n\n"
-                f"Diagnostic file:\n{error_file}"
-            ),
-            16,
+    main()
         )
 
         raise
