@@ -2143,6 +2143,20 @@ if uploaded_file is not None:
 
                 except Exception as e:
                     failure_count += 1
+                
+                    # Show the first API failure directly in the Streamlit interface.
+                    if failure_count == 1:
+                        st.error(
+                            f"MDTGPT request failed on Excel row {row_number}: "
+                            f"{type(e).__name__}: {e}"
+                        )
+                
+                        with st.expander("Technical error details", expanded=True):
+                            st.write("Model endpoint:", get_model_endpoint())
+                            st.write("Exception type:", type(e).__name__)
+                            st.exception(e)
+                        st.stop()
+                
                     results.append({
                         "row_number": row_number,
                         "product_event_id": row_dict.get("Product Event ID"),
