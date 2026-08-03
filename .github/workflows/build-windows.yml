@@ -41,7 +41,6 @@ jobs:
             --noconfirm `
             --clean `
             --onedir `
-            --windowed `
             --name "QA-Monitoring-Tool" `
             --collect-all streamlit `
             --copy-metadata streamlit `
