@@ -51,21 +51,11 @@ def get_last_updated_from_github():
     except Exception:
         return "Unknown"
 
-if os.getenv("QA_MONITORING_DESKTOP") == "1":
-    with st.sidebar:
-        st.markdown("### Desktop Application")
-
-        if st.button("Exit QA Monitoring Tool"):
-            threading.Timer(
-                0.75,
-                lambda: os._exit(0),
-            ).start()
-
-            st.success(
-                "The application is closing. "
-                "You can close this browser tab."
-            )
-            st.stop()
+st.set_page_config(
+    page_title="QA Monitoring Tool",
+    layout="wide",
+    initial_sidebar_state="expanded",
+)
 
 last_updated = get_last_updated_from_github()
 
