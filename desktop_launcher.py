@@ -120,6 +120,7 @@ def main():
 
     os.environ["STREAMLIT_BROWSER_GATHER_USAGE_STATS"] = "false"
     os.environ["STREAMLIT_GLOBAL_DEVELOPMENT_MODE"] = "false"
+    os.environ["QA_MONITORING_DESKTOP"] = "1"
 
     sys.argv = [
         "streamlit",
