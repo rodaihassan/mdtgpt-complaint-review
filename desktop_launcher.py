@@ -118,15 +118,14 @@ def main():
         daemon=True,
     ).start()
 
-    os.environ.setdefault(
-        "STREAMLIT_BROWSER_GATHER_USAGE_STATS",
-        "false",
-    )
+    os.environ["STREAMLIT_BROWSER_GATHER_USAGE_STATS"] = "false"
+    os.environ["STREAMLIT_GLOBAL_DEVELOPMENT_MODE"] = "false"
 
     sys.argv = [
         "streamlit",
         "run",
         str(app_path),
+        "--global.developmentMode=false",
         "--server.address=127.0.0.1",
         f"--server.port={port}",
         "--server.headless=true",
