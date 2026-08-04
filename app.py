@@ -7,6 +7,8 @@ import zipfile
 from datetime import date, datetime
 from xml.etree import ElementTree as ET
 
+import time
+
 import pandas as pd
 import requests
 import streamlit as st
@@ -463,10 +465,9 @@ model_id = st.text_input(
 )
 
 bearer_token = st.text_input(
-    "MDTGPT Bearer Token",
-    value="",
+    "Bearer Token",
+    value=os.getenv("MDTGPT_API_TOKEN", ""),
     type="password",
-    help="Enter your authorized MDTGPT token. It is used only for this Streamlit session.",
 )
 
 timeout_seconds = st.number_input(
@@ -897,18 +898,49 @@ def build_model_request_json(complaint_record):
 def get_model_endpoint():
     return f"{base_models_url.rstrip('/')}/{model_id.strip()}"
 
-def send_row_to_model(session, token, complaint_record, timeout):
+TRANSIENT_STATUS_CODES = {429, 500, 502, 503, 504}
+
+def send_row_to_model(session, token, complaint_record, timeout, attempts=3, wait_seconds=3):
     headers = {"Content-Type": "application/json"}
     if token:
         headers["Authorization"] = f"Bearer {token}"
 
-    response = session.post(
-        get_model_endpoint(),
-        headers=headers,
-        json=build_model_request_json(complaint_record),
-        timeout=timeout,
+    last_error = None
+
+    for attempt in range(1, attempts + 1):
+        try:
+            response = session.post(
+                get_model_endpoint(),
+                headers=headers,
+                json=build_model_request_json(complaint_record),
+                timeout=timeout,
+            )
+
+            if response.status_code in TRANSIENT_STATUS_CODES and attempt < attempts:
+                time.sleep(wait_seconds)
+                continue
+
+            return response
+
+        except (
+            requests.exceptions.ConnectionError,
+            requests.exceptions.Timeout,
+            requests.exceptions.RequestException,
+        ) as e:
+            last_error = e
+            if attempt < attempts:
+                time.sleep(wait_seconds)
+            else:
+                raise RuntimeError(
+                    f"MDTGPT request failed after {attempts} attempts for Excel row "
+                    f"{complaint_record.get('rowNumber')}: {e}"
+                ) from e
+
+    raise RuntimeError(
+        f"MDTGPT request failed after {attempts} attempts for Excel row "
+        f"{complaint_record.get('rowNumber')}: {last_error}"
     )
-    return response
+
 
 def clean_excel_cell_value(value):
     if isinstance(value, (dict, list, tuple)):
@@ -2043,10 +2075,12 @@ if uploaded_file is not None:
 
             session = requests.Session()
             results = []
+            failed_rows = []
             success_count = 0
             failure_count = 0
             progress = st.progress(0)
             status_box = st.empty()
+
 
             for processed_index, (idx, row) in enumerate(main_df.iterrows(), start=1):
                 row_number = int(idx) + 1
@@ -2062,7 +2096,10 @@ if uploaded_file is not None:
                         token=bearer_token,
                         complaint_record=complaint_record,
                         timeout=int(timeout_seconds),
+                        attempts=3,
+                        wait_seconds=2,
                     )
+
                     if not response.ok:
                         raise RuntimeError(
                         f"MDTGPT returned HTTP {response.status_code} for Excel row "
@@ -2143,20 +2180,6 @@ if uploaded_file is not None:
 
                 except Exception as e:
                     failure_count += 1
-                
-                    # Show the first API failure directly in the Streamlit interface.
-                    if failure_count == 1:
-                        st.error(
-                            f"MDTGPT request failed on Excel row {row_number}: "
-                            f"{type(e).__name__}: {e}"
-                        )
-                
-                        with st.expander("Technical error details", expanded=True):
-                            st.write("Model endpoint:", get_model_endpoint())
-                            st.write("Exception type:", type(e).__name__)
-                            st.exception(e)
-                        st.stop()
-                
                     results.append({
                         "row_number": row_number,
                         "product_event_id": row_dict.get("Product Event ID"),
@@ -2203,6 +2226,13 @@ if uploaded_file is not None:
                         "inconsistency_types": None,
                         "exact_inconsistency_found": None,
                     })
+                    failed_rows.append({
+                        "row_number": row_number,
+                        "row_dict": row_dict,
+                        "complaint_record": complaint_record,
+                        "request_json": request_json,
+                    })
+
 
                 percent_complete = int((processed_index / len(main_df)) * 100)
                 progress.progress(percent_complete)
@@ -2210,6 +2240,116 @@ if uploaded_file is not None:
                     f"Processed {processed_index}/{len(main_df)} rows. "
                     f"Success: {success_count}, Failed: {failure_count}"
                 )
+
+            if failed_rows:
+                st.write(f"Retrying {len(failed_rows)} failed rows...")
+                retry_session = requests.Session()
+                retry_success_count = 0
+                retry_failure_count = 0
+
+                for failed_item in failed_rows:
+                    row_number = failed_item["row_number"]
+                    row_dict = failed_item["row_dict"]
+                    complaint_record = failed_item["complaint_record"]
+                    request_json = failed_item["request_json"]
+
+                    try:
+                        response = send_row_to_model(
+                            session=retry_session,
+                            token=bearer_token,
+                            complaint_record=complaint_record,
+                            timeout=int(timeout_seconds),
+                            attempts=5,
+                            wait_seconds=5,
+                        )
+
+                        if not response.ok:
+                            retry_failure_count += 1
+                            continue
+
+                        try:
+                            response_body = response.json()
+                        except Exception:
+                            response_body = response.text
+
+                        model_content = extract_model_content(response_body)
+                        layer2_result = parse_layer2_response(response_body)
+                        layer1_result = layer1_rule_based_screening(row_dict=row_dict)
+                        layer3_result = layer3_prioritization(layer1_result, layer2_result)
+                        categorization_result = build_clear_categorization(
+                            layer1_result=layer1_result,
+                            layer2_result=layer2_result,
+                            layer3_result=layer3_result,
+                            row_dict=row_dict,
+                        )
+
+                        result_record = {
+                            "row_number": row_number,
+                            "product_event_id": row_dict.get("Product Event ID"),
+                            "pe_pli_number": row_dict.get("PE - PLI #"),
+                            "complaint_indicator": row_dict.get("Complaint? - PE"),
+                            "country": get_country_value(row_dict),
+                            "product_description": row_dict.get("Product Description - PE PLI"),
+                            "rfr_code": row_dict.get("RFR Code"),
+                            "fdp_code": row_dict.get("FDP Code"),
+                            "reportable": row_dict.get("Reportable?"),
+                            "investigation_required": row_dict.get("Investigation Required?"),
+                            "event_description": row_dict.get("Event Description - PE"),
+                            "investigation_summary": row_dict.get("Summary of Investigation Results"),
+                            "status_code": response.status_code,
+                            "success": response.ok,
+                            "model_endpoint": get_model_endpoint(),
+                            "request_json": json.dumps(request_json, ensure_ascii=False, default=str),
+                            "complaint_record_json": json.dumps(complaint_record, ensure_ascii=False, default=str),
+                            "layer1_flags": " | ".join(layer1_result["layer1_flags"]),
+                            "layer1_reasons": " | ".join(layer1_result["layer1_reasons"]),
+                            "layer1_score": layer1_result["layer1_score"],
+                            "response_body": (
+                                json.dumps(response_body, ensure_ascii=False, default=str)
+                                if isinstance(response_body, dict)
+                                else response_body
+                            ),
+                            "model_content": model_content,
+                            "coding_event_description_inconsistency": layer2_result.get("coding_event_description_inconsistency"),
+                            "coding_event_description_reason": layer2_result.get("coding_event_description_reason"),
+                            "coding_regulatory_decision_inconsistency": layer2_result.get("coding_regulatory_decision_inconsistency"),
+                            "coding_regulatory_decision_reason": layer2_result.get("coding_regulatory_decision_reason"),
+                            "coding_investigation_decision_inconsistency": layer2_result.get("coding_investigation_decision_inconsistency"),
+                            "coding_investigation_decision_reason": layer2_result.get("coding_investigation_decision_reason"),
+                            "layer2_flag": layer2_result.get("layer2_flag"),
+                            "concern_level": layer2_result.get("concern_level"),
+                            "layer2_reason": layer2_result.get("layer2_reason"),
+                            "priority_tier": layer3_result["priority_tier"],
+                            "priority_score": layer3_result["priority_score"],
+                            "priority_reasons": " | ".join(layer3_result["priority_reasons"]),
+                            "category_name": categorization_result["category_name"],
+                            "category_short_reason": categorization_result["category_short_reason"],
+                            "category_detailed_reason": categorization_result["category_detailed_reason"],
+                            "recommended_action": categorization_result["recommended_action"],
+                            "inconsistency_count": categorization_result["inconsistency_count"],
+                            "inconsistency_types": categorization_result["inconsistency_types"],
+                            "exact_inconsistency_found": build_exact_inconsistency_found(layer2_result, row_dict),
+                        }
+
+                        for i, rec in enumerate(results):
+                            if rec.get("row_number") == row_number:
+                                results[i] = result_record
+                                break
+
+                        failure_count -= 1
+                        success_count += 1
+                        retry_success_count += 1
+
+                    except Exception as retry_error:
+                        retry_failure_count += 1
+                        st.write(f"Row {row_number} still failed on retry: {retry_error}")
+
+                st.write(
+                    f"Retry complete. Retry successes: {retry_success_count}, "
+                    f"Retry failures: {retry_failure_count}"
+                )
+
+
 
             st.subheader("Summary")
             st.write(f"Successful rows: {success_count}")
